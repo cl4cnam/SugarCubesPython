@@ -27,3 +27,9 @@ def writeTab(pFunc_write, pn_nombreTab, ps_texte):
 	ps_texte = getAvecTab(ps_texte, pn_nombreTab)
 	pFunc_write(ps_texte)
 
+def setParent(pList_children, p_parent):
+	for child in pList_children:
+		try:
+			child.a_parent = p_parent
+		except AttributeError:
+			pass

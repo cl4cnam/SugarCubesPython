@@ -1,13 +1,13 @@
 from SugarCubes import *
 
-test = {
-	'program':
-		Par(
-			Print('coucou'),
-			Print('beuh')
-		)
-	,
-	'expected': '''
+test = Actor(
+	Par(
+		Print('coucou'),
+		Print('beuh')
+	)
+)
+
+expected = '''
 1 :
 coucou
 beuh
@@ -21,4 +21,3 @@ beuh
 9 :
 10 :
 '''
-}

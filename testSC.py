@@ -55,34 +55,34 @@ def cancelTracer(pClass, ps_nomAttribFunc):
 		ls_save = 'save_'
 	setattr(   pClass,  ps_nomAttribFunc,  getattr(pClass, ls_save + ps_nomAttribFunc)   )
 
-def runTest(pTest):
+def runTest(pModule_test):
 	import sys
 	import io
 
 	stdout_save = sys.stdout
 	sys.stdout = io.StringIO('')
 
-	gEngine = Engine()
-	gEngine.add(pTest['program'])
+	gMonde = Monde()
+	gMonde.addActor(pModule_test.test)
 	for i in range(1, 11):
-		print(str(gEngine.ai_instant) + ' :')
-		gEngine.doMacroEtape()
+		print(str(gMonde.aInstant.an_num) + ' :')
+		gMonde.doMacroEtape()
 
 	sys.stdout.seek(0)
 	resultat = sys.stdout.read()
 	sys.stdout = stdout_save
 
-	if resultat == pTest['expected'].lstrip():
+	if resultat == pModule_test.expected.lstrip():
 		print('OK')
 		return True
 	else:
 		print('ERREUR')
 		print('-----------------PROGRAMME--------------------')
-		print(gEngine.aInstruction_program)
+		print(gMonde.aProgParallel)
 		print('-----------------OBTENU-----------------------')
 		print(resultat)
 		print('-----------------ATTENDU----------------------')
-		print(pTest['expected'].lstrip())
+		print(pModule_test.expected.lstrip())
 		print('=============================================================')
 		return False
 
@@ -90,26 +90,11 @@ pourStderr = True
 # pourStderr = False
 
 for n in range(1000):
-# for n in range(1, 19):
 	import importlib
 	try:
 		leModuleDeTest = importlib.import_module('test.test' + str(n))
 	except ImportError:
 		continue
 	print('Test num ' + str(n), end=' : ')
-	# if n==18:
-	# # if n==17:
-		# tracerDebutEtFin(LiveInstruction, 'doMicroEtape')
-		# tracerDebutEtFin(LiveInstruction, 'setFiniPourMacroEtape')
-		# tracerDebutEtFin(LiveInstrPause, 'doTransition')
-		# # tracerDebutEtFin(LiveInstrPause, 'setNouvelleMacroEtape')
-		# tracerDebutEtFin(LiveInstrSeq_, 'doTransition')
-		# # tracerDebutEtFin(LiveLoop, 'doTransition')
-		# # # tracer(LivePar, 'doTransition', '<<', '>>')
-	if not runTest(leModuleDeTest.test): break
-	# if n==17:
-		# cancelTracer(LiveInstruction, 'doMicroEtape')
-		# cancelTracer(LiveInstruction, 'setFiniPourMacroEtape')
-		# cancelTracer(LiveInstrPause, 'doTransition')
-		# # tracerDebutEtFin(LiveInstrPause, 'setNouvelleMacroEtape')
-		# cancelTracer(LiveInstrSeq_, 'doTransition')
+	# printErr('Test num ' + str(n))
+	if not runTest(leModuleDeTest): break

@@ -1,7 +1,6 @@
 from SugarCubes import *
 
-test = {
-	'program':
+test = Actor(
 		Repeat(
 			Repeat(
 				Repeat(
@@ -12,8 +11,9 @@ test = {
 			),
 			0
 		)
-	,
-	'expected': '''
+)
+
+expected = '''
 1 :
 2 :
 3 :
@@ -25,4 +25,3 @@ test = {
 9 :
 10 :
 '''
-}
