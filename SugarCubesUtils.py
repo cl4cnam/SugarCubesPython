@@ -14,8 +14,8 @@ def printErrExit(ps_texte):
 	sys.exit()
 
 def getAvecTab(ps_texte, pn_nombreTab):
-	# TAB='\t'
-	TAB='    '
+	TAB='\t'
+	# TAB='    '
 	# TAB='..'
 	ps_texte = TAB*pn_nombreTab + ps_texte
 	ls_newlineALaFin = '\n' if ps_texte[-1] == '\n' else ''

@@ -62,10 +62,17 @@ def runTest(pModule_test):
 	stdout_save = sys.stdout
 	sys.stdout = io.StringIO('')
 
+	try:
+		pModule_test.init()
+	except AttributeError: pass
+
+
 	gMonde = Monde()
 	gMonde.addActor(pModule_test.test)
 	for i in range(1, 11):
-		print(str(gMonde.aInstant.an_num) + ' :')
+		if hasattr(pModule_test, 'async'):
+			pModule_test.async(gMonde)
+		print(str(gMonde.aInstant.an_num + 1) + ' :')
 		gMonde.doMacroEtape()
 
 	sys.stdout.seek(0)
@@ -90,6 +97,7 @@ pourStderr = True
 # pourStderr = False
 
 for n in range(1000):
+	# if n != 124: continue
 	import importlib
 	try:
 		leModuleDeTest = importlib.import_module('test.test' + str(n))
