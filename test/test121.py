@@ -3,7 +3,7 @@ from SugarCubes import *
 test = Actor(
 	Par(
 		RepeatS(forever,
-			KillS('f',
+			Kill('f',
 				RepeatS(forever,
 					Await('e'),
 					Write('Hello World !')

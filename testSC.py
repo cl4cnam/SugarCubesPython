@@ -69,7 +69,12 @@ def runTest(pModule_test):
 
 	gMonde = Monde()
 	gMonde.addActor(pModule_test.test)
-	for i in range(1, 11):
+	if hasattr(pModule_test, 'maxI'):
+		gNombreInstant = pModule_test.maxI
+	else:
+		gNombreInstant = 10
+	for i in range(1, gNombreInstant + 1):
+	# for i in range(1, 4):
 		if hasattr(pModule_test, 'async'):
 			pModule_test.async(gMonde)
 		print(str(gMonde.aInstant.an_num + 1) + ' :')
@@ -97,7 +102,7 @@ pourStderr = True
 # pourStderr = False
 
 for n in range(1000):
-	# if n != 124: continue
+	# if n != 204: continue
 	import importlib
 	try:
 		leModuleDeTest = importlib.import_module('test.test' + str(n))

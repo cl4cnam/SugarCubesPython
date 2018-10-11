@@ -1,9 +1,8 @@
 from SugarCubes import *
 
 test = Actor(
-		Repeat(
-			Print('Hello World !'),
-			3
+		Repeat(3,
+			Print('Hello World !')
 		)
 )
 

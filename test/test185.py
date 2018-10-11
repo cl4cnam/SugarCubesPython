@@ -2,14 +2,13 @@ from SugarCubes import *
 
 test = Actor(
 	Par(
-		Write('Hello World !'),
-		Write('Hello World !')
+		Kill('e', Pause(0), Write('--> e')),
+		Seq(Pause(4), Generate('e'))
 	)
 )
 
 expected = '''
 1 :
-Hello World !
 2 :
 3 :
 4 :

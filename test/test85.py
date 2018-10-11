@@ -2,9 +2,8 @@ from SugarCubes import *
 
 test = Actor(
 	Par(
-		Repeat(
-			Generate('e'),
-			3
+		Repeat(3,
+			Generate('e')
 		),
 		Seq(
 			Pause(2),

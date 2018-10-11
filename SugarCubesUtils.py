@@ -4,6 +4,10 @@ def getGlobalByName(ps_moduleName, ps_name):
 	lGlobal = getattr(lModule, ps_name)
 	return lGlobal
 
+def getObjectById(pn_id):
+	import ctypes
+	return ctypes.cast(pn_id, ctypes.py_object).value
+
 def printErr(ps_texte):
 	import sys
 	sys.stderr.write(ps_texte + '\n')
