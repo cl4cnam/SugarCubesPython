@@ -8,9 +8,8 @@
 from SugarCubesUtils import *
 
 # avancements
-PAS_FINI_POUR_MACRO_ETAPE = 0
-FINI_POUR_MACRO_ETAPE = 1
-FIN = 2
+PAS_FINI = 0
+FINI = 1
 
 forever = -1
 
@@ -19,7 +18,12 @@ class Info:
 		self.as_type = ps_type
 		self.a_valeur = p_valeur
 	def isSensor(self):
-		return self.as_type == '$'
+		return self.as_type[0] == '$'
+	def getValeur(self):
+		if callable(self.a_valeur):
+			return self.a_valeur()
+		else:
+			return self.a_valeur
 	def addToDictInfo(self, pDictInfo):
 		try:
 			pDictInfo[self.as_type]
@@ -33,6 +37,7 @@ class Instant:
 		self.an_num = p_instant.an_num + 1 if isinstance(p_instant, Instant) else 0
 		self.aDict_configOuString__typesInfoAttendu = {} # clé : id(await), valeur : config
 		self.aDictInfo_pourInstantSuivant = {}
+		self.aSetLiveProg_finiPourLInstant = set()
 		try:
 			self.aDictInfo_diffusees = p_instant.aDictInfo_pourInstantSuivant
 		except AttributeError:
@@ -67,22 +72,21 @@ class Processeur:
 			]
 		)
 	def doMacroEtape(self):
-		# Mise en place nouvelleMacroEtape
+		# Mise en place nouvel instant
 		#---------------------------------
 		self.aInstant = Instant(self.aInstant)
-		# printErr('--> num instant : ' + str(self.aInstant.an_num))
-		self.aLiveProgParallel.setNouvelleMacroEtape()
 		
 		# Exécution normale
 		#---------------------------------
-		# printErr('--> num (setNouvelleMacroEtape) instant : ' + str(self.aInstant.an_num))
+		# printErr('---------------------------------------------------------------------')
+		# printErr('--> num instant : ' + str(self.aInstant.an_num))
+		# printErr('---------------------------------------------------------------------')
 		while not self.aLiveProgParallel.isFiniPourMacroEtape():
 			self.aLiveProgParallel.doMicroEtape()
 			if not self.isThereSomethingToUnblock(): break
 		
 		# Exécution spéciale "fin d'instant"
 		#-----------------------------------
-		# printErr('--> num (fin) instant : ' + str(self.aInstant.an_num))
 		self.aLiveProgParallel.doMicroEtapeDeFinDInstant()
 		
 		# Exécution ActionOnConfig
@@ -137,19 +141,13 @@ class Program: # abstract
 		ls_milieu = getAvecTab(ls_milieu, self.__class__.niv_tab)
 		self.__class__.niv_tab -= 1
 		return ls_debut + ls_milieu + ls_fin
+initUtils(__name__, Program)
 
 class LiveProgram: # abstract
 	def __init__(self, *args):
-		self.ai_avancement = PAS_FINI_POUR_MACRO_ETAPE
+		self.ai_avancement = PAS_FINI
 		self.aList_args = list(args)
 		setParent(args, self)
-		self.aFrozenset_eventGenerable = self.getEventGenerable().union(*[
-			arg.aFrozenset_eventGenerable
-			for arg in self.aList_args
-			if isinstance(arg, LiveProgram)
-		])
-	def getEventGenerable(self):
-		return frozenset([])
 	def getPropriete(self, ps_nomPropriete):
 		try:
 			return getattr(self.aProg, ps_nomPropriete)
@@ -164,21 +162,31 @@ class LiveProgram: # abstract
 			return self.aProcesseur
 		except AttributeError:
 			return self.a_parent.getProcesseur()
-	def setNouvelleMacroEtape(self):
-		self.setPlusFiniPourMacroEtape()
-		for arg in self.aList_args:
-			if isinstance(arg, LiveProgram):
-				arg.setNouvelleMacroEtape()
 	def isFiniPourMacroEtape(self):
-		return self.ai_avancement >= FINI_POUR_MACRO_ETAPE
+		return self.isTerminee() or id(self) in self.getProcesseur().aInstant.aSetLiveProg_finiPourLInstant
 	def isTerminee(self):
-		return self.ai_avancement == FIN
+		return self.ai_avancement == FINI
+	def copyAvancement(self, pLiveProg):
+		self.ai_avancement = pLiveProg.ai_avancement
+		lSetLiveProg_fini = self.getProcesseur().aInstant.aSetLiveProg_finiPourLInstant
+		if pLiveProg.isFiniPourMacroEtape():
+			self.setFiniPourMacroEtape()
+		else:
+			lSetLiveProg_fini.discard(id(self))
+	def copyMinAvancement(self, pListLiveProg):
+		lList_avancement = [ lLiveProg.ai_avancement for lLiveProg in pListLiveProg ]
+		self.ai_avancement = min(  lList_avancement  ) if len(lList_avancement) else FINI
+		lSetLiveProg_fini = self.getProcesseur().aInstant.aSetLiveProg_finiPourLInstant
+		if all( [
+			lLiveProg.isFiniPourMacroEtape() or lLiveProg.isTerminee()
+			for lLiveProg in pListLiveProg
+		] ):
+			self.setFiniPourMacroEtape()
 	def setFiniPourMacroEtape(self):
-		self.ai_avancement = max(self.ai_avancement, FINI_POUR_MACRO_ETAPE)
-	def setPlusFiniPourMacroEtape(self):
-		if not self.isTerminee(): self.ai_avancement = PAS_FINI_POUR_MACRO_ETAPE
+		lSetLiveProg_fini = self.getProcesseur().aInstant.aSetLiveProg_finiPourLInstant
+		lSetLiveProg_fini.add(id(self))
 	def terminer(self):
-		self.ai_avancement = FIN
+		self.ai_avancement = FINI
 	def doMicroEtape(self):
 		if not self.isFiniPourMacroEtape():
 			self.doTransition()
@@ -187,7 +195,7 @@ class LiveProgram: # abstract
 	def doTransitionFinale(self):
 		pass
 
-class ProgExecWithStop(Program): pass
+@deLive('double')
 class LiveProgExecWithStop(LiveProgram):
 	def __init__(self, p_configEvent, pLiveProg, pLiveProg_lastWill=None):
 		super().__init__(p_configEvent, pLiveProg, pLiveProg_lastWill)
@@ -197,7 +205,7 @@ class LiveProgExecWithStop(LiveProgram):
 		self.ab_killable = True
 	def doTransition(self):
 		self.aLiveProg.doMicroEtape()
-		self.ai_avancement = self.aLiveProg.ai_avancement
+		self.copyAvancement(self.aLiveProg)
 	def doTransitionFinale(self):
 		self.aLiveProg.doMicroEtapeDeFinDInstant()
 		lInstant = self.getProcesseur().aInstant
@@ -208,9 +216,8 @@ class LiveProgExecWithStop(LiveProgram):
 				self.ab_killable = False
 			else:
 				self.terminer()
-ExecWithStop = ProgExecWithStop
 
-class ProgWhen(Program): pass
+@deLive('double')
 class LiveProgWhen(LiveProgram):
 	def __init__(self, p_configEvent, pLiveProg, pLiveProg_else=None):
 		super().__init__(p_configEvent, pLiveProg, pLiveProg_else)
@@ -230,18 +237,17 @@ class LiveProgWhen(LiveProgram):
 				lInstant.aDict_configOuString__typesInfoAttendu[id(self)] = self.a_configEvent
 		if self.aLiveProg_courant != None:
 			self.aLiveProg_courant.doMicroEtape()
-			self.ai_avancement = self.aLiveProg_courant.ai_avancement
+			self.copyAvancement(self.aLiveProg_courant)
 	def doTransitionFinale(self):
 		if self.aLiveProg_courant != None:
 			self.aLiveProg_courant.doMicroEtapeDeFinDInstant()
-			self.ai_avancement = self.aLiveProg_courant.ai_avancement
+			self.copyAvancement(self.aLiveProg_courant)
 		else:
 			self.aLiveProg_courant = self.aLiveProg_else
 			if self.aLiveProg_else == None:
 				self.terminer()
-When = ProgWhen
 
-class ProgTest(Program): pass
+@deLive('double')
 class LiveProgTest(LiveProgram):
 	def __init__(self, p_condition, pLiveProg, pLiveProg_else=None):
 		super().__init__(p_condition, pLiveProg, pLiveProg_else)
@@ -261,12 +267,11 @@ class LiveProgTest(LiveProgram):
 				self.aLiveProg_courant = self.aLiveProg_else
 		if self.aLiveProg_courant != None:
 			self.aLiveProg_courant.doMicroEtape()
-			self.ai_avancement = self.aLiveProg_courant.ai_avancement
+			self.copyAvancement(self.aLiveProg_courant)
 		else:
 			self.terminer()
-Test = ProgTest
 
-class ProgMatch(Program): pass
+@deLive('double')
 class LiveProgMatch(LiveProgram):
 	def __init__(self, p_condition, *pList_LiveProg):
 		super().__init__(p_condition, *pList_LiveProg)
@@ -284,12 +289,11 @@ class LiveProgMatch(LiveProgram):
 			except IndexError: pass
 		if self.aLiveProg_courant != None:
 			self.aLiveProg_courant.doMicroEtape()
-			self.ai_avancement = self.aLiveProg_courant.ai_avancement
+			self.copyAvancement(self.aLiveProg_courant)
 		else:
 			self.terminer()
-Match = ProgMatch
 
-class ProgNothing(Program): pass
+@deLive('double')
 class LiveProgNothing(LiveProgram):
 	def __init__(self, *args):
 		super().__init__(*args)
@@ -298,9 +302,8 @@ class LiveProgNothing(LiveProgram):
 		pass
 	def doTransitionFinale(self):
 		pass
-Nothing = ProgNothing
 
-class ProgAnd(Program): pass
+@deLive('double')
 class LiveProgAnd(LiveProgram):
 	def __init__(self, *args):
 		super().__init__(*args)
@@ -312,9 +315,8 @@ class LiveProgAnd(LiveProgram):
 			lProcesseur.aInstant.evalConfig(arg)
 			for arg in self.aList_args
 		])
-And = ProgAnd
 
-class ProgOr(Program): pass
+@deLive('double')
 class LiveProgOr(LiveProgram):
 	def __init__(self, *args):
 		super().__init__(*args)
@@ -326,9 +328,8 @@ class LiveProgOr(LiveProgram):
 			lProcesseur.aInstant.evalConfig(arg)
 			for arg in self.aList_args
 		])
-Or = ProgOr
 
-class ProgDiffuse(Program): pass
+@deLive('double')
 class LiveProgDiffuse(LiveProgram):
 	def __init__(self, ps_typeInfo, p_valeurInfo=None):
 		super().__init__(ps_typeInfo, p_valeurInfo)
@@ -337,11 +338,11 @@ class LiveProgDiffuse(LiveProgram):
 	def doTransition(self):
 		lProcesseur = self.getProcesseur()
 		lDictInfo_diffusees = lProcesseur.aInstant.aDictInfo_diffusees
-		self.aInfo.addToDictInfo(lDictInfo_diffusees)
+		lInfo_updated = Info(self.aInfo.as_type, self.aInfo.getValeur())
+		lInfo_updated.addToDictInfo(lDictInfo_diffusees)
 		self.terminer()
-Diffuse = ProgDiffuse
 
-class ProgFilter(Program): pass
+@deLive('simple')
 class LiveProgFilter(LiveProgram):
 	def __init__(self, ps_typeSensor, ps_typeInfo, pFunc_filtre):
 		super().__init__(ps_typeSensor, ps_typeInfo, pFunc_filtre)
@@ -359,7 +360,7 @@ class LiveProgFilter(LiveProgram):
 				Info(self.as_typeInfo, l_valRet).addToDictInfo(lDictInfo_diffusees)
 		self.terminer()
 
-class ProgAwait(Program): pass
+@deLive('double')
 class LiveProgAwait(LiveProgram):
 	def __init__(self, p_typesInfoAttendue):
 		super().__init__(p_typesInfoAttendue)
@@ -375,9 +376,8 @@ class LiveProgAwait(LiveProgram):
 			lProcesseur.aInstant.aDict_configOuString__typesInfoAttendu[id(self)] = self.a_typesInfoAttendue
 	def doTransitionFinale(self):
 		pass
-Await = ProgAwait
 
-class ProgControl(Program): pass
+@deLive('double')
 class LiveProgControl(LiveProgram):
 	def __init__(self, p_typesInfoAttendue, pLiveProg):
 		super().__init__(p_typesInfoAttendue, pLiveProg)
@@ -390,34 +390,30 @@ class LiveProgControl(LiveProgram):
 				del lProcesseur.aInstant.aDict_configOuString__typesInfoAttendu[id(self)]
 			except KeyError: pass
 			self.aLiveProg.doMicroEtape()
-			self.ai_avancement = self.aLiveProg.ai_avancement
+			self.copyAvancement(self.aLiveProg)
 		else:
 			lProcesseur.aInstant.aDict_configOuString__typesInfoAttendu[id(self)] = self.a_typesInfoAttendue
 	def doTransitionFinale(self):
 		lProcesseur = self.getProcesseur()
 		if lProcesseur.aInstant.evalConfig(self.a_typesInfoAttendue):
 			self.aLiveProg.doMicroEtapeDeFinDInstant()
-			self.ai_avancement = self.aLiveProg.ai_avancement
-Control = ProgControl
+			self.copyAvancement(self.aLiveProg)
 
-class ProgPause(Program): pass
+@deLive('double')
 class LiveProgPause(LiveProgram):
 	def __init__(self, pn_nombreFois=1):
 		super().__init__(pn_nombreFois)
 		self.ai_pausesRestantes = pn_nombreFois
-		if self.ai_pausesRestantes == 0:
-			self.terminer()
 	def doTransition(self):
-		self.setFiniPourMacroEtape()
-		if self.ai_pausesRestantes > 0: self.ai_pausesRestantes -= 1
-	def setNouvelleMacroEtape(self):
 		if self.ai_pausesRestantes == 0:
 			self.terminer()
 		else:
-			self.setPlusFiniPourMacroEtape()
-Pause = ProgPause
+			self.ai_pausesRestantes -= 1
+			self.setFiniPourMacroEtape()
+	def setNouvelleMacroEtape(self):
+		self.setPlusFiniPourMacroEtape()
 
-class ProgramAtom(Program): pass
+@deLive('simple')
 class LiveProgramAtom(LiveProgram): # abstract
 	def doTransition(self):
 		self.getProcesseur().aInstant.aListFun_actionAtomique.append(self.doIt)
@@ -439,7 +435,8 @@ class LiveProgAtomAction(LiveProgramAtom):
 		lFun()
 
 def fonctionVide(pDict_info): pass
-class ProgActionOnConfig(Program): pass
+
+@deLive('double')
 class LiveProgActionOnConfig(LiveProgramAtom):
 	def doTransition(self):
 		try:
@@ -453,7 +450,6 @@ class LiveProgActionOnConfig(LiveProgramAtom):
 			'defaut': self.aList_args[2]
 		})
 		self.terminer()
-ActionOnConfig = ProgActionOnConfig
 
 class ProgParallel(Program):
 	def add(self, pProg):
@@ -470,11 +466,11 @@ class LiveProgParallel(LiveProgram):
 	def doTransition(self):
 		for l_instr in self.aList_args:
 			l_instr.doMicroEtape()
-		self.ai_avancement = min(  [ arg.ai_avancement for arg in self.aList_args ]  )
+		self.copyMinAvancement(self.aList_args)
 	def doTransitionFinale(self):
 		for l_instr in self.aList_args:
 			l_instr.doMicroEtapeDeFinDInstant()
-		self.ai_avancement = min(  [ arg.ai_avancement for arg in self.aList_args ]  )
+		self.copyMinAvancement(self.aList_args)
 		
 		if self.as_typeInfo_channel != None:
 			lInstant = self.getProcesseur().aInstant
@@ -486,56 +482,46 @@ class LiveProgParallel(LiveProgram):
 					lDict_nouvBranch[id(self)] = []
 				for lLiveProg in lInstant.aDictInfo_diffusees[self.as_typeInfo_channel]:
 					lDict_nouvBranch[id(self)].append(lLiveProg)
-				self.ai_avancement = 0
+				self.ai_avancement = PAS_FINI
 ProgPar = ProgParallel
 Par = ProgParallel
 
 class LiveProgSeq_(LiveProgram):
-	def __init__(self, pTuple_args, *pDefIter_instr, pFunc_getNewIter):
-		super().__init__(pTuple_args)
-		self.aIter_instr = pFunc_getNewIter(*pDefIter_instr)
+	def __init__(self, pIter_instr):
+		super().__init__()
+		self.aIter_instr = pIter_instr
 	def doTransition(self):
 		while True:
-			self.aProg_courante.doMicroEtape()
-			if not self.aProg_courante.isTerminee():
-				self.ai_avancement = self.aProg_courante.ai_avancement
-				return
 			try:
-				self.aProg_courante = next(self.aIter_instr)
-				self.setNouvelleMacroEtape()
+				if not hasattr(self, 'aProg_courante') or self.aProg_courante.isTerminee():
+					self.aProg_courante = next(self.aIter_instr)
+					setParent([self.aProg_courante], self)
 			except StopIteration:
 				break
+			self.aProg_courante.doMicroEtape()
+			if not self.aProg_courante.isTerminee():
+				self.copyAvancement(self.aProg_courante)
+				return
 		self.terminer()
 	def doTransitionFinale(self):
 		try:
 			self.aProg_courante.doMicroEtapeDeFinDInstant()
 			if not self.aProg_courante.isTerminee():
-				self.ai_avancement = self.aProg_courante.ai_avancement
+				self.copyAvancement(self.aProg_courante)
 		except AttributeError: pass
-	def setNouvelleMacroEtape(self):
-		if not hasattr(self, 'aProg_courante') or self.aProg_courante.isTerminee():
-			try:
-				self.aProg_courante = next(self.aIter_instr)
-			except StopIteration:
-				self.terminer()
-		self.setPlusFiniPourMacroEtape()
-		if hasattr(self, 'aProg_courante'):
-			self.aProg_courante.setNouvelleMacroEtape()
 
-class ProgSequence(Program): pass
+@deLive('simple')
 class LiveProgSequence(LiveProgram):
-	def __new__(cls, *args, **kwargs):
-		l_tmpSeq = LiveProgSeq_(args, args, pFunc_getNewIter=iter)
-		setParent(args, l_tmpSeq)
-		return l_tmpSeq
+	def __new__(cls, *args):
+		return LiveProgSeq_(iter(args))
 	def __str__(self):
 		return '; '.join( [ str(arg) for arg in self.aList_args ] )
 ProgSeq = ProgSequence
 Seq = ProgSequence
 
-class ProgLoop(Program): pass
+@deLive('double')
 class LiveProgLoop(LiveProgram):
-	def __new__(cls, pLiveProgram_corps, pn_nombreFois=1, pFunc_cond=None, **kwargs):
+	def __new__(cls, pLiveProgram_corps, pn_nombreFois=1, pFunc_cond=None):
 		def getNewIter(pLiveProgram_corps, pn_nombreFois):
 			if pn_nombreFois == 0: raise StopIteration
 			ln_nombreProgDejaFaite = 0
@@ -545,21 +531,15 @@ class LiveProgLoop(LiveProgram):
 				lParent = pLiveProgram_corps.a_parent
 				pLiveProgram_corps = pLiveProgram_corps.aProg.getLive()
 				pLiveProgram_corps.a_parent = lParent
-				pLiveProgram_corps.setNouvelleMacroEtape()
 				if pFunc_cond != None:
 					if not pFunc_cond(): break
 				if ln_nombreProgDejaFaite >= pn_nombreFois*2 - 1 and pn_nombreFois != -1: break
-				yield Pause().getLive()
+				lLivePause = Pause().getLive()
+				lLivePause.a_parent = lParent
+				yield lLivePause
 				ln_nombreProgDejaFaite += 1
 			raise StopIteration
-		l_tmpLoop = LiveProgSeq_(
-			(pLiveProgram_corps,),
-			pLiveProgram_corps, pn_nombreFois,
-			pFunc_getNewIter=getNewIter
-		)
-		setParent([pLiveProgram_corps], l_tmpLoop)
-		return l_tmpLoop
-Loop = ProgLoop
+		return LiveProgSeq_(  getNewIter(pLiveProgram_corps, pn_nombreFois)  )
 
 # Instruction composée
 #---------------------
@@ -571,6 +551,7 @@ def ActionMulti(pFun, pn_nombreFois=1):
 	return Loop(  ProgAtomAction(pFun), pn_nombreFois  )
 def Repeat(pn_nombreFois, *args):
 	return Loop(   Seq(*args),  pn_nombreFois   )
+RepeatS = Repeat
 def RepeatForever(*args):
 	return Repeat(-1, *args)
 def IfRepeat(pFunc_condition, *args):
@@ -581,9 +562,10 @@ def IfRepeatLabel(ps_label, pFunc_condition, *args):
 	return lProg
 def Filter(ps_typeSensor, ps_typeInfo, pFunc_filtre, pn_nombreFois=1):
 	return Loop(   ProgFilter(ps_typeSensor, ps_typeInfo, pFunc_filtre),  pn_nombreFois   )
-RepeatS = Repeat
 def ControlS(p_configEvent, *args):
 	return ProgControl(p_configEvent, Seq(*args))
+def KillS(p_configEvent, *args):
+	return ExecWithStop(p_configEvent, Seq(*args))
 def PauseForever():
 	return Pause(forever)
 def Parex(ps_typeInfo_channel, *args):
@@ -605,30 +587,3 @@ Processeur.react = Processeur.doMacroEtape
 Monde = Processeur
 Actor = Par
 Processeur.addActor = Processeur.addProgram
-
-# Objets actifs (décorateurs)
-#----------------------------
-def active(pClass):
-	class classeComposee(Par, pClass):
-		def __init__(self, *args, **kwargs):
-			lList_nomMethodeActive = [
-				ls_func
-				for ls_func in dir(pClass)
-				if callable(getattr(pClass, ls_func)) and hasattr(getattr(pClass, ls_func), 'toCallNTimes')
-			]
-			lList_methodeActive = [
-				getattr(pClass, ls_methActive) for ls_methActive in lList_nomMethodeActive
-			]
-			lList_prog = [
-				Repeat( lFunc_methActive.toCallNTimes, *lFunc_methActive(self) )
-				for lFunc_methActive in lList_methodeActive
-			]
-			Par.__init__(self, *lList_prog)
-			pClass.__init__(self, *args, **kwargs)
-	return classeComposee
-
-def automatic(pn_nombreFois):
-	def tempAuto(pMethod):
-		pMethod.toCallNTimes = pn_nombreFois
-		return pMethod
-	return tempAuto

@@ -1,5 +1,5 @@
-from SugarCubesUtils import *
-from SugarCubes import *
+# from SugarCubesUtils import *
+from SugarCubesDeco import *
 
 def indent(pb_pourStderr, pn_nombreTabSupplementaire):
 	import sys, functools
@@ -55,7 +55,7 @@ def cancelTracer(pClass, ps_nomAttribFunc):
 		ls_save = 'save_'
 	setattr(   pClass,  ps_nomAttribFunc,  getattr(pClass, ls_save + ps_nomAttribFunc)   )
 
-def runTest(pModule_test):
+def runTest(pModule_test, pMonde):
 	import sys
 	import io
 
@@ -67,8 +67,9 @@ def runTest(pModule_test):
 	except AttributeError: pass
 
 
-	gMonde = Monde()
-	gMonde.addActor(pModule_test.test)
+	# gMonde = Monde()
+	# initMonde(gMonde)
+	# gMonde.addActor(pModule_test.test)
 	if hasattr(pModule_test, 'maxI'):
 		gNombreInstant = pModule_test.maxI
 	else:
@@ -76,9 +77,9 @@ def runTest(pModule_test):
 	for i in range(1, gNombreInstant + 1):
 	# for i in range(1, 4):
 		if hasattr(pModule_test, 'async'):
-			pModule_test.async(gMonde)
-		print(str(gMonde.aInstant.an_num + 1) + ' :')
-		gMonde.doMacroEtape()
+			pModule_test.async(pMonde)
+		print(str(pMonde.aInstant.an_num + 1) + ' :')
+		pMonde.doMacroEtape()
 
 	sys.stdout.seek(0)
 	resultat = sys.stdout.read()
@@ -103,19 +104,13 @@ pourStderr = True
 
 for n in range(1000):
 	# if n != 107: continue
+	gMonde = Monde()
+	initMonde(gMonde)
 	import importlib
-	
 	try:
-		leModuleDeTest = importlib.import_module('test.test' + str(n))
+		leModuleDeTest = importlib.import_module('test.test_B' + str(n))
 	except ImportError:
 		continue
 	print('Test num ' + str(n), end=' : ')
 	# printErr('Test num ' + str(n))
-	if not runTest(leModuleDeTest): break
-	
-	try:
-		leModuleDeTest_C = importlib.import_module('test.test_C' + str(n))
-	except ImportError:
-		continue
-	print('Test_C num ' + str(n), end=' : ')
-	if not runTest(leModuleDeTest_C): break
+	if not runTest(leModuleDeTest, gMonde): break

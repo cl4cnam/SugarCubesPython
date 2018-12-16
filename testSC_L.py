@@ -1,5 +1,5 @@
-from SugarCubesUtils import *
-from SugarCubes import *
+# from SugarCubesUtils import *
+from SugarCubesLang import *
 
 def indent(pb_pourStderr, pn_nombreTabSupplementaire):
 	import sys, functools
@@ -55,46 +55,53 @@ def cancelTracer(pClass, ps_nomAttribFunc):
 		ls_save = 'save_'
 	setattr(   pClass,  ps_nomAttribFunc,  getattr(pClass, ls_save + ps_nomAttribFunc)   )
 
-def runTest(pModule_test):
+def runTest(ps_fichTest):
 	import sys
 	import io
 
+	import os.path
+	if not os.path.isfile(ps_fichTest):
+		# print(ps_fichTest)
+		return True
+	print(ps_fichTest, end=' : ')
 	stdout_save = sys.stdout
 	sys.stdout = io.StringIO('')
 
-	try:
-		pModule_test.init()
-	except AttributeError: pass
-
-
-	gMonde = Monde()
-	gMonde.addActor(pModule_test.test)
-	if hasattr(pModule_test, 'maxI'):
-		gNombreInstant = pModule_test.maxI
+	# try:
+		# pModule_test.init()
+	# except AttributeError: pass
+	lModule_test = importScPy(ps_fichTest[:-3])
+	if hasattr(lModule_test.test, 'processeurIntegre'):
+		lModule_test.test()
 	else:
-		gNombreInstant = 10
-	for i in range(1, gNombreInstant + 1):
-	# for i in range(1, 4):
-		if hasattr(pModule_test, 'async'):
-			pModule_test.async(gMonde)
-		print(str(gMonde.aInstant.an_num + 1) + ' :')
-		gMonde.doMacroEtape()
+		gProcesseur = Processeur()
+		gProcesseur.addProgram(lModule_test.test)
+		if hasattr(lModule_test, 'maxI'):
+			gNombreInstant = lModule_test.maxI
+		else:
+			gNombreInstant = 10
+		for i in range(1, gNombreInstant + 1):
+		# for i in range(1, 4):
+			if hasattr(lModule_test, 'async'):
+				lModule_test.async(gProcesseur)
+			print(str(gProcesseur.aInstant.an_num + 1) + ' :')
+			gProcesseur.doMacroEtape()
 
 	sys.stdout.seek(0)
 	resultat = sys.stdout.read()
 	sys.stdout = stdout_save
 
-	if resultat == pModule_test.expected.lstrip():
+	if resultat == lModule_test.expected.lstrip():
 		print('OK')
 		return True
 	else:
 		print('ERREUR')
-		print('-----------------PROGRAMME--------------------')
-		print(gMonde.aProgParallel)
+		# print('-----------------PROGRAMME--------------------')
+		# print(gMonde.aProgParallel)
 		print('-----------------OBTENU-----------------------')
 		print(resultat)
 		print('-----------------ATTENDU----------------------')
-		print(pModule_test.expected.lstrip())
+		print(lModule_test.expected.lstrip())
 		print('=============================================================')
 		return False
 
@@ -102,20 +109,9 @@ pourStderr = True
 # pourStderr = False
 
 for n in range(1000):
-	# if n != 107: continue
-	import importlib
-	
-	try:
-		leModuleDeTest = importlib.import_module('test.test' + str(n))
-	except ImportError:
-		continue
-	print('Test num ' + str(n), end=' : ')
-	# printErr('Test num ' + str(n))
-	if not runTest(leModuleDeTest): break
-	
-	try:
-		leModuleDeTest_C = importlib.import_module('test.test_C' + str(n))
-	except ImportError:
-		continue
-	print('Test_C num ' + str(n), end=' : ')
-	if not runTest(leModuleDeTest_C): break
+# for n in range(3):
+	# if n != 244: continue
+	# if not n in [223, 244]: continue
+	# if not n in [242, 244]: continue
+	if not runTest('test/test_L' + str(n) + '.py'): break
+	if not runTest('test/test_M' + str(n) + '.py'): break

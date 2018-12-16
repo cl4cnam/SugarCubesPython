@@ -1,4 +1,4 @@
-from SugarCubes import *
+from SugarCubesDeco import *
 
 @active
 class Otarie:
@@ -9,7 +9,7 @@ class Otarie:
 	def ditBonjour(self):
 		print("Bonjour, je m'appelle " + self.as_nom)
 	
-	@automatic(forever)
+	@repeat(forever)
 	def crie(self):
 		return [
 			Print('wah'),

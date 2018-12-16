@@ -1,8 +1,34 @@
+def initUtils(ps_moduleName, pClass_baseProgram):
+	global gs_moduleSugarCubes, gClass_baseProgram
+	gs_moduleSugarCubes = ps_moduleName
+	gClass_baseProgram = pClass_baseProgram
+
 def getGlobalByName(ps_moduleName, ps_name):
 	import sys
 	lModule = sys.modules[ps_moduleName]
 	lGlobal = getattr(lModule, ps_name)
 	return lGlobal
+
+def deLive(ps_genre): # ps_genre = 'simple' | 'double'
+	def lFunc_temp(pClass):
+		ls_sansLive = pClass.__name__[4:]
+		import sys
+		lModule = sys.modules[gs_moduleSugarCubes]
+		lNewClass = type(ls_sansLive, (gClass_baseProgram,), {})
+		setattr(
+			lModule,
+			ls_sansLive,
+			lNewClass
+		)
+		if ps_genre == 'double':
+			ls_sansLive_sansProg = ls_sansLive[4:]
+			setattr(
+				lModule,
+				ls_sansLive_sansProg,
+				lNewClass
+			)
+		return pClass
+	return lFunc_temp
 
 def getObjectById(pn_id):
 	import ctypes
@@ -10,7 +36,7 @@ def getObjectById(pn_id):
 
 def printErr(ps_texte):
 	import sys
-	sys.stderr.write(ps_texte + '\n')
+	sys.stderr.write(str(ps_texte) + '\n')
 
 def printErrExit(ps_texte):
 	import sys
