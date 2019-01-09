@@ -1,10 +1,12 @@
 from SugarCubesLang import *
 
-# @sugarcube(10, printInstant=True)
+def aggregMin(pList_val):
+	return [min(pList_val)]
+
 @sugarcube
 def test():
-	repeat 0:
-		print('Hello World !')
+	while False :
+		print '--> ok'
 
 expected = '''
 1 :

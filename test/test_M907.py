@@ -1,15 +1,19 @@
 from SugarCubesLang import *
 
-# @sugarcube(10, printInstant=True)
 @sugarcube
 def test():
-	repeat 0:
-		print('Hello World !')
+	a = 100
+	b = 7
+	pause
+	e = ( a <= b )
+	pause
+	print('--> ' + str(e))
 
 expected = '''
 1 :
 2 :
 3 :
+--> False
 4 :
 5 :
 6 :

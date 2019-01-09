@@ -12,7 +12,7 @@ def fun():
 @sugarcube
 def test():
 	paral:
-		while fun:
+		ifRepeat fun:
 			print '--> hello'
 		seq:
 			pause 5

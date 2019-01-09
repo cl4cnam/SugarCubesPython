@@ -13,6 +13,37 @@ FINI = 1
 
 forever = -1
 
+gListStr_operatorsBin = ['add', 'sub', 'mul', 'truediv', 'floordiv', 'mod', 'divmod', 'pow', 'lshift', 'rshift', 'and', 'or', 'xor', 'lt', 'le', 'eq', 'ne', 'gt', 'ge']
+
+class ListeValInfo:
+	def __init__(self, pList_val):
+		self.aList_val = pList_val
+	def __iter__(self):
+		return iter(self.aList_val)
+	def __str__(self):
+		# return '\n'.join([str(val.evaluate() if hasattr(val, 'evaluate') else val) for val in self.aList_val])
+		return '\n'.join([str(val) for val in self.aList_val])
+	def __bool__(self):
+		return all(self.aList_val)
+	@classmethod
+	def addOperToListeValInfo(cls, ps_operator):
+		def tempOper(self, pListeValInfo):
+			import operator
+			return self.__class__(
+				[
+					getattr(operator, '__' + ps_operator + '__')(val1, val2)
+					for val1 in self
+					for val2 in pListeValInfo
+				]
+			)
+		setattr(cls, '__' + ps_operator + '__', tempOper)
+	@classmethod
+	def addListeOperToListeValInfo(cls, pListeStr_operator):
+		for ls_operator in pListeStr_operator:
+			cls.addOperToListeValInfo(ls_operator)
+
+ListeValInfo.addListeOperToListeValInfo(gListStr_operatorsBin)
+
 class Info:
 	def __init__(self, ps_type, p_valeur):
 		self.as_type = ps_type
@@ -20,7 +51,9 @@ class Info:
 	def isSensor(self):
 		return self.as_type[0] == '$'
 	def getValeur(self):
-		if callable(self.a_valeur):
+		if isinstance(self.a_valeur, LiveProgram) and hasattr(self.a_valeur, 'evaluate'):
+			return self.a_valeur.evaluate()
+		elif callable(self.a_valeur):
 			return self.a_valeur()
 		else:
 			return self.a_valeur
@@ -42,9 +75,18 @@ class Instant:
 			self.aDictInfo_diffusees = p_instant.aDictInfo_pourInstantSuivant
 		except AttributeError:
 			self.aDictInfo_diffusees = {}
+		try:
+			self.aDictInfo_diffuseesPrecedemment = p_instant.aDictInfo_diffusees
+		except AttributeError:
+			self.aDictInfo_diffuseesPrecedemment = {}
 		self.aListFun_actionAtomique = []
 		self.aListFun_actionAtomiqueOnConfig = []
 		self.aDictList_nouvellesBranches = {} # clé : id(par), valeur : listes des nouvelles branches
+	def evalVal(self, ps_typeInfo__pLiveProgram_boolean):
+		try:
+			return ps_typeInfo__pLiveProgram_boolean.evaluate()
+		except AttributeError:
+			return self.aDictInfo_diffuseesPrecedemment[ps_typeInfo__pLiveProgram_boolean]
 	def evalConfig(self, ps_typeInfo__pLiveProgram_boolean):
 		try:
 			return ps_typeInfo__pLiveProgram_boolean.evaluate()
@@ -114,6 +156,7 @@ class Program: # abstract
 	def __init__(self, *args, **kwargs):
 		self.aList_args = list(args)
 		self.aDict_kwargs = dict(kwargs)
+		self.aDict_localsCaller = getLocalsCaller()
 	def getClassNameLive(self, pClass):
 		try:
 			return getGlobalByName(__name__, 'Live' + pClass.__name__)
@@ -329,6 +372,66 @@ class LiveProgOr(LiveProgram):
 			for arg in self.aList_args
 		])
 
+def addOperatorBin(ps_operator):
+	class tempLiveProgOperBin(LiveProgram):
+		def __init__(self, *args):
+			super().__init__(*args)
+		def doTransition(self):
+			self.terminer()
+		def evaluate(self):
+			lProcesseur = self.getProcesseur()
+			l_arg0_orig = self.aList_args[0]
+			l_arg1_orig = self.aList_args[1]
+			l_arg0 = l_arg0_orig.evaluate() if hasattr(l_arg0_orig, 'evaluate') else ListeValInfo([l_arg0_orig])
+			l_arg1 = l_arg1_orig.evaluate() if hasattr(l_arg1_orig, 'evaluate') else ListeValInfo([l_arg1_orig])
+			import operator
+			return getattr(operator, '__' + ps_operator + '__')(l_arg0, l_arg1)
+	ls_nomClasse = 'LiveProg' + ps_operator[0].upper() + ps_operator[1:] + 'Bin'
+	tempLiveProgOperBin.__name__ = ls_nomClasse
+	tempLiveProgOperBin = deLive('double')(tempLiveProgOperBin)
+	globals()[ls_nomClasse] = tempLiveProgOperBin
+def addListeOperatorBin(pListStr_operator):
+	for ls_operator in pListStr_operator:
+		addOperatorBin(ls_operator)
+
+addListeOperatorBin(gListStr_operatorsBin)
+
+@deLive('double')
+class LiveProgGetval(LiveProgram):
+	def __init__(self, *args):
+		super().__init__(*args)
+		self.as_typeInfo = self.aList_args[0]
+		if len(args) == 2:
+			self.aFunc_aggreg = self.aList_args[1]
+		else:
+			self.aFunc_aggreg = lambda x:x
+		if len(args) > 2: raise TypeError("Trop d'argument : Getval prend un ou deux argument")
+	def doTransition(self):
+		self.terminer()
+	def evaluate(self):
+		lDict_localsCaller = self.aProg.aDict_localsCaller
+		# printErr(lDict_localsCaller)
+		if self.as_typeInfo in lDict_localsCaller:
+			return ListeValInfo(   [lDict_localsCaller[self.as_typeInfo]]   )
+		else:
+			lProcesseur = self.getProcesseur()
+			lListeValInfo = ListeValInfo(   self.aFunc_aggreg( lProcesseur.aInstant.evalVal(self.as_typeInfo) )   )
+			return lListeValInfo
+
+@deLive('double')
+class LiveProgSequentialFunction(LiveProgram):
+	def __init__(self, *args):
+		super().__init__(*args)
+		self.aFunc_fonction = self.aList_args[0]
+		self.aList_argumentsFonction = self.aList_args[1:]
+	def doTransition(self):
+		self.terminer()
+	def evaluate(self):
+		return ListeValInfo([   self.aFunc_fonction(*[
+			arg.evaluate() if hasattr(arg, 'evaluate') else arg
+			for arg in self.aList_argumentsFonction
+		])   ])
+
 @deLive('double')
 class LiveProgDiffuse(LiveProgram):
 	def __init__(self, ps_typeInfo, p_valeurInfo=None):
@@ -338,8 +441,16 @@ class LiveProgDiffuse(LiveProgram):
 	def doTransition(self):
 		lProcesseur = self.getProcesseur()
 		lDictInfo_diffusees = lProcesseur.aInstant.aDictInfo_diffusees
-		lInfo_updated = Info(self.aInfo.as_type, self.aInfo.getValeur())
-		lInfo_updated.addToDictInfo(lDictInfo_diffusees)
+		l_valeur = self.aInfo.getValeur()
+		if isinstance(l_valeur, ListeValInfo):
+			# printErr(l_valeur.aList_val)
+			for val in l_valeur:
+				# printErr(val)
+				lInfo_updated = Info(self.aInfo.as_type, val)
+				lInfo_updated.addToDictInfo(lDictInfo_diffusees)
+		else:
+			lInfo_updated = Info(self.aInfo.as_type, l_valeur)
+			lInfo_updated.addToDictInfo(lDictInfo_diffusees)
 		self.terminer()
 
 @deLive('simple')
@@ -422,7 +533,9 @@ class LiveProgramAtom(LiveProgram): # abstract
 class ProgAtomPrint(ProgramAtom): pass
 class LiveProgAtomPrint(LiveProgramAtom):
 	def doIt(self):
-		print(self.aList_args[0])
+		l_argOrig = self.aList_args[0]
+		l_arg = l_argOrig.evaluate() if hasattr(l_argOrig, 'evaluate') else l_argOrig
+		print(l_arg)
 Print = ProgAtomPrint
 
 class ProgAtomAction(ProgramAtom): pass
@@ -490,6 +603,8 @@ class LiveProgSeq_(LiveProgram):
 	def __init__(self, pIter_instr):
 		super().__init__()
 		self.aIter_instr = pIter_instr
+		lList_elemSupplementaires = next(self.aIter_instr)
+		setParent(lList_elemSupplementaires, self)
 	def doTransition(self):
 		while True:
 			try:
@@ -513,7 +628,8 @@ class LiveProgSeq_(LiveProgram):
 @deLive('simple')
 class LiveProgSequence(LiveProgram):
 	def __new__(cls, *args):
-		return LiveProgSeq_(iter(args))
+		lList_elemsSupplementaires = []
+		return LiveProgSeq_(   iter( [lList_elemsSupplementaires] + list(args) )   )
 	def __str__(self):
 		return '; '.join( [ str(arg) for arg in self.aList_args ] )
 ProgSeq = ProgSequence
@@ -521,23 +637,53 @@ Seq = ProgSequence
 
 @deLive('double')
 class LiveProgLoop(LiveProgram):
-	def __new__(cls, pLiveProgram_corps, pn_nombreFois=1, pFunc_cond=None):
+	def __new__(cls, pLiveProgram_corps, pn_nombreFois=1, pFunc_cond=None, pb_conditionPartout=False):
 		def getNewIter(pLiveProgram_corps, pn_nombreFois):
+			lList_elemsSupplementaires = [pFunc_cond]
+			yield lList_elemsSupplementaires
 			if pn_nombreFois == 0: raise StopIteration
 			ln_nombreProgDejaFaite = 0
 			while True:
+				# verif condition si pb_conditionPartout
+				#---------------------------------------
+				if pb_conditionPartout and pFunc_cond != None:
+					if not pFunc_cond: break
+					if hasattr(pFunc_cond, 'evaluate') and not pFunc_cond.evaluate(): break
+				
+				# exec corps
+				#-----------
 				yield pLiveProgram_corps
+				
+				# reset corps
+				#------------
 				ln_nombreProgDejaFaite += 1
 				lParent = pLiveProgram_corps.a_parent
 				pLiveProgram_corps = pLiveProgram_corps.aProg.getLive()
 				pLiveProgram_corps.a_parent = lParent
+				
+				# verif condition
+				#----------------
 				if pFunc_cond != None:
-					if not pFunc_cond(): break
+					if hasattr(pFunc_cond, 'evaluate'):
+						lb_res = pFunc_cond.evaluate()
+						# printErr('--------------> ' + str(type(lb_res)))
+						if not lb_res: break
+					elif callable(pFunc_cond) and not pFunc_cond(): break
+					elif not pFunc_cond: break
+				# printErr(pn_nombreFois)
+				
+				# verif nombre de tour
+				#---------------------
 				if ln_nombreProgDejaFaite >= pn_nombreFois*2 - 1 and pn_nombreFois != -1: break
+				
+				# exec pause
+				#-----------
 				lLivePause = Pause().getLive()
 				lLivePause.a_parent = lParent
 				yield lLivePause
+				
 				ln_nombreProgDejaFaite += 1
+				# printErr('+++++++++++++++++++++++++++++')
 			raise StopIteration
 		return LiveProgSeq_(  getNewIter(pLiveProgram_corps, pn_nombreFois)  )
 
@@ -556,6 +702,8 @@ def RepeatForever(*args):
 	return Repeat(-1, *args)
 def IfRepeat(pFunc_condition, *args):
 	return Loop(   Seq(*args),  -1,  pFunc_condition  )
+def While(pFunc_condition, *args):
+	return Loop(   Seq(*args),  -1,  pFunc_condition,  True  )
 def IfRepeatLabel(ps_label, pFunc_condition, *args):
 	lProg = IfRepeat(pFunc_condition, *args)
 	lProg.as_label = ps_label

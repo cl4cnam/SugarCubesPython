@@ -115,3 +115,4 @@ for n in range(1000):
 	# if not n in [242, 244]: continue
 	if not runTest('test/test_L' + str(n) + '.py'): break
 	if not runTest('test/test_M' + str(n) + '.py'): break
+	if not runTest('test/test_N' + str(n) + '.py'): break

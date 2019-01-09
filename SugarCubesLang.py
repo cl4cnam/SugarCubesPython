@@ -11,7 +11,8 @@ gDict_debBlock_unArg = {
 	'control': 'ControlS',
 	'parex': 'Parex',
 	'generateProg': 'Generate',
-	'while': 'IfRepeat',
+	'ifRepeat': 'IfRepeat',
+	'while': 'While',
 }
 gDict_debBlockSimple = {
 	'paral': 'Par',
@@ -23,6 +24,9 @@ def modifySource(ps_source):
 	import re
 	ls_source = ps_source
 	ls_source = re.sub(r'^(\s*)pause$', r'\1pause()', ls_source, 0, re.MULTILINE)
+	
+	# ls_source = re.sub(r'^(.+)\s+=\s+(.+)\s+\$\s+(.+)$', r'\1 = _g_g_g_\3(\2)', ls_source, 0, re.MULTILINE)
+	ls_source = re.sub(r'^(.+)\s+=\s+(.+)\s+\$\s+(.+)$', r'\1_g_g_g_\3 = \2', ls_source, 0, re.MULTILINE)
 	
 	for ls_elt in gDict_debBlock_unArg:
 		ls_source = re.sub(ls_elt + r' (.*):', r'for _i_i_i_' + gDict_debBlock_unArg[ls_elt] + r' in range(\1):', ls_source)
@@ -67,15 +71,79 @@ def sugarifiee(pFunc_prog):
 	lNode_prog = ast.parse(ls_sourceFunc)
 	
 	class Visiteur(ast.NodeTransformer):
+		def __init__(self):
+			self.aList_vars = []
+			self.aListFunc_aggreg = []
+		def visit_Compare(self, node):
+			self.generic_visit(node)
+			ls_nomOper = node.ops[0].__class__.__name__
+			if ls_nomOper == 'LtE': ls_nomOper = 'Le'
+			if ls_nomOper == 'GtE': ls_nomOper = 'Ge'
+			if ls_nomOper == 'NotEq': ls_nomOper = 'Ne'
+			# printErr(ls_nomOper)
+			return ast.Call(
+				func=ast.Name(id=ls_nomOper+'Bin', ctx=ast.Load()),
+				args=[node.left, node.comparators[0]],
+				keywords=[],
+				starargs=None,
+				kwargs=None
+			)
+		def visit_BinOp(self, node):
+			self.generic_visit(node)
+			ls_nomOper = node.op.__class__.__name__
+			if ls_nomOper == 'Mult': ls_nomOper = 'Mul'
+			if ls_nomOper == 'Div': ls_nomOper = 'Truediv'
+			if ls_nomOper == 'FloorDiv': ls_nomOper = 'Floordiv'
+			if ls_nomOper == 'LShift': ls_nomOper = 'Lshift'
+			if ls_nomOper == 'RShift': ls_nomOper = 'Rshift'
+			if ls_nomOper == 'BitOr': ls_nomOper = 'Or'
+			if ls_nomOper == 'BitXor': ls_nomOper = 'Xor'
+			if ls_nomOper == 'BitAnd': ls_nomOper = 'And'
+			# printErr(ls_nomOper)
+			return ast.Call(
+				func=ast.Name(id=ls_nomOper+'Bin', ctx=ast.Load()),
+				args=[node.left, node.right],
+				keywords=[],
+				starargs=None,
+				kwargs=None
+			)
+			# return node
 		def visit_Name(self, node):
 			if node.id in gList_instrSimple:
 				return ast.Name(node.id[0].upper() + node.id[1:], ast.Load())
-			if node.id == 'AND':
+			elif node.id == 'AND':
 				return ast.Name('And', ast.Load())
-			if node.id == 'OR':
+			elif node.id == 'OR':
 				return ast.Name('Or', ast.Load())
+			elif hasattr(self, 'aList_vars') and node.id in self.aList_vars and not hasattr(node, 'ab_cibleAffectation'):
+				l_args = [ ast.Str(s=node.id) ]
+				if len(self.aListFunc_aggreg) > 0:
+					l_args.append(   ast.Name( id=self.aListFunc_aggreg[-1], ctx=ast.Load() )   )
+				return ast.Call(
+					func=ast.Name(id='Getval', ctx=ast.Load()),
+					args=l_args,
+					keywords=[],
+					starargs=None,
+					kwargs=None
+				)
 			return node
-		
+		def visit_Call(self, node):
+			self.generic_visit(node)
+			# printErr(dir(__builtins__))
+			import builtins
+			if node.func.id in builtins.__dict__:
+			# if node.func.id == 'str':
+				return ast.Call(
+					func=ast.Name(id='SequentialFunction', ctx=ast.Load()),
+					args=[
+						ast.Name(id=node.func.id, ctx=ast.Load()),
+						node.args[0]
+					],
+					keywords=[],
+					starargs=None,
+					kwargs=None
+				)
+			return node
 		def visit_If(self, node):
 			self.generic_visit(node)
 			# node.test, node.body, node.orelse
@@ -104,12 +172,28 @@ def sugarifiee(pFunc_prog):
 			)
 		
 		def visit_Assign(self, node):
+			lNode_cible = node.targets[0]
+			ls_cibleApparente = lNode_cible.id
+			
+			lNode_cible.ab_cibleAffectation = True
+			
+			if '_g_g_g_' in ls_cibleApparente:
+				ls_cible, ls_funcAggreg = ls_cibleApparente.split('_g_g_g_')
+				self.aListFunc_aggreg.append(ls_funcAggreg)
+			else:
+				ls_cible = ls_cibleApparente
+			
 			self.generic_visit(node)
+			
+			if '_g_g_g_' in ls_cibleApparente:
+				self.aListFunc_aggreg.pop()
+			
+			self.aList_vars.append(ls_cible)
 			lNode_diffuse = ast.Call(
 				func=ast.Name(id='Diffuse', ctx=ast.Load()),
 				args=[
 					ast.Str(
-						s=node.targets[0].id
+						s=ls_cible
 					),
 					node.value
 				],
@@ -121,7 +205,7 @@ def sugarifiee(pFunc_prog):
 			return lNode_diffuse
 		
 		def visit_For(self, node):
-			self.generic_visit(node)
+			# self.generic_visit(node)
 			if node.target.id.startswith('_i_i_i_'):
 				import re
 				ls_instr = re.match(r'_i_i_i_(\S*)', node.target.id).group(1)
@@ -135,17 +219,20 @@ def sugarifiee(pFunc_prog):
 					starargs=None,
 					kwargs=None
 				)
+				self.generic_visit(lNode_repeat)
 				return lNode_repeat
 			if node.target.id.startswith('_PPP_'):
 				import re
 				ls_instr = re.match(r'_PPP_(\S*)', node.target.id).group(1)
-				return ast.Call(
+				lNode_trans = ast.Call(
 					func=ast.Name(id=ls_instr, ctx=ast.Load()),
 					args=node.body,
 					keywords=[],
 					starargs=None,
 					kwargs=None
 				)
+				self.generic_visit(lNode_trans)
+				return lNode_trans
 			return node
 		
 		def visit_Expr(self, node):
@@ -155,8 +242,6 @@ def sugarifiee(pFunc_prog):
 		def visit_Module(self, node):
 			# printErr(ast.dump(node))
 			self.generic_visit(node)
-			# return ast.Expression(node.body[0].body[0].value)
-			# lNode_body = node.body[1].body
 			lNode_body = node.body[0].body
 			lNode_seq = ast.Call(
 				func=ast.Name(id='Seq', ctx=ast.Load()),
@@ -167,7 +252,9 @@ def sugarifiee(pFunc_prog):
 			)
 			return ast.Expression(lNode_seq)
 	
-	lNode_prog = Visiteur().visit(lNode_prog)
+	lVisiteur = Visiteur()
+	# lNode_prog = lVisiteur.visit(lNode_prog)
+	lNode_prog = lVisiteur.visit(lNode_prog)
 	ast.fix_missing_locations(lNode_prog)
 	
 	# printErr(ast.dump(lNode_prog, True, True))

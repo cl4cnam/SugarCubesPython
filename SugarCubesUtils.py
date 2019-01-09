@@ -9,6 +9,10 @@ def getGlobalByName(ps_moduleName, ps_name):
 	lGlobal = getattr(lModule, ps_name)
 	return lGlobal
 
+def getLocalsCaller():
+	import inspect
+	return inspect.currentframe().f_back.f_back.f_locals
+
 def deLive(ps_genre): # ps_genre = 'simple' | 'double'
 	def lFunc_temp(pClass):
 		ls_sansLive = pClass.__name__[4:]
@@ -61,5 +65,5 @@ def setParent(pList_children, p_parent):
 	for child in pList_children:
 		try:
 			child.a_parent = p_parent
-		except AttributeError:
-			pass
+		except AttributeError: pass
+		except TypeError: pass
