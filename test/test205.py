@@ -6,7 +6,7 @@ myCount = 0
 def fun1(v):
 	return 1
 
-def async(m):
+def asyncPre(m):
 	global myCount
 	myCount += 1
 	if myCount == 10:

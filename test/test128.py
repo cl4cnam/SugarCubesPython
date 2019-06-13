@@ -8,7 +8,7 @@ def traiteTexte(v):
 def fun1(v):
 	return v[0]
 
-def async(m):
+def asyncPre(m):
 	m.generateEvent('$sens1', "Hello World !")
 
 test = Actor(

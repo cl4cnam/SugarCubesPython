@@ -75,8 +75,8 @@ def runTest(pModule_test):
 		gNombreInstant = 10
 	for i in range(1, gNombreInstant + 1):
 	# for i in range(1, 4):
-		if hasattr(pModule_test, 'async'):
-			pModule_test.async(gMonde)
+		if hasattr(pModule_test, 'asyncPre'):
+			pModule_test.asyncPre(gMonde)
 		print(str(gMonde.aInstant.an_num + 1) + ' :')
 		gMonde.doMacroEtape()
 

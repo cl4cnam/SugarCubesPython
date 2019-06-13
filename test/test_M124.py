@@ -8,7 +8,7 @@ def traiteTexte(v):
 def fun1(v):
 	return "Hello World !"
 
-def async(m):
+def asyncPre(m):
 	m.generateEvent('$sens1', "Hello World !")
 
 @sugarcube

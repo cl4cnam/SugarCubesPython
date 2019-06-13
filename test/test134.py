@@ -14,7 +14,7 @@ def fun1(v):
 	myCount2 += 1
 	return ls_ret
 
-def async(m):
+def asyncPre(m):
 	global myCount
 	m.generateEvent('$sens2', "Hello World !" + str(myCount))
 	myCount += 1

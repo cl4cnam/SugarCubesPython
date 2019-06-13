@@ -641,7 +641,7 @@ class LiveProgLoop(LiveProgram):
 		def getNewIter(pLiveProgram_corps, pn_nombreFois):
 			lList_elemsSupplementaires = [pFunc_cond]
 			yield lList_elemsSupplementaires
-			if pn_nombreFois == 0: raise StopIteration
+			if pn_nombreFois == 0: return
 			ln_nombreProgDejaFaite = 0
 			while True:
 				# verif condition si pb_conditionPartout
@@ -684,7 +684,7 @@ class LiveProgLoop(LiveProgram):
 				
 				ln_nombreProgDejaFaite += 1
 				# printErr('+++++++++++++++++++++++++++++')
-			raise StopIteration
+			return
 		return LiveProgSeq_(  getNewIter(pLiveProgram_corps, pn_nombreFois)  )
 
 # Instruction composée

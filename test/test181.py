@@ -1,6 +1,6 @@
 from SugarCubes import *
 
-def async(m):
+def asyncPre(m):
 	global sctest_count
 	sctest_count += 1
 	if sctest_count%2 == 0:

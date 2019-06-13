@@ -82,8 +82,8 @@ def runTest(ps_fichTest):
 			gNombreInstant = 10
 		for i in range(1, gNombreInstant + 1):
 		# for i in range(1, 4):
-			if hasattr(lModule_test, 'async'):
-				lModule_test.async(gProcesseur)
+			if hasattr(lModule_test, 'asyncPre'):
+				lModule_test.asyncPre(gProcesseur)
 			print(str(gProcesseur.aInstant.an_num + 1) + ' :')
 			gProcesseur.doMacroEtape()
 

@@ -1,6 +1,6 @@
 from SugarCubes import *
 
-gList_instrSimple = ['print', 'pause', 'await', 'diffuse', 'generate', 'action', 'actionOn', 'filter']
+gList_instrSimple = ['print', 'pause', 'waitFor', 'diffuse', 'generate', 'action', 'actionOn', 'filter']
 gDict_debBlock_unArg = {
 	'repeat': 'Repeat',
 	'when': 'When',
@@ -23,6 +23,7 @@ gDict_debBlockSimple = {
 def modifySource(ps_source):
 	import re
 	ls_source = ps_source
+	ls_source = re.sub(r'await', r'waitFor', ls_source)
 	ls_source = re.sub(r'^(\s*)pause$', r'\1pause()', ls_source, 0, re.MULTILINE)
 	
 	# ls_source = re.sub(r'^(.+)\s+=\s+(.+)\s+\$\s+(.+)$', r'\1 = _g_g_g_\3(\2)', ls_source, 0, re.MULTILINE)
@@ -110,7 +111,8 @@ def sugarifiee(pFunc_prog):
 			# return node
 		def visit_Name(self, node):
 			if node.id in gList_instrSimple:
-				return ast.Name(node.id[0].upper() + node.id[1:], ast.Load())
+				ls_nomMajuscule = 'Await' if node.id == 'waitFor' else node.id[0].upper() + node.id[1:]
+				return ast.Name(ls_nomMajuscule, ast.Load())
 			elif node.id == 'AND':
 				return ast.Name('And', ast.Load())
 			elif node.id == 'OR':

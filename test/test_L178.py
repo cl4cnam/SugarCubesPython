@@ -1,6 +1,6 @@
 from SugarCubesLang import *
 
-def async(m):
+def asyncPre(m):
 	m.generateEvent('$sens1')
 
 maxI = 12

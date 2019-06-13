@@ -1,6 +1,6 @@
 from SugarCubes import *
 
-def async(m):
+def asyncPre(m):
 	m.generateEvent('$sens1')
 
 test = Actor(
