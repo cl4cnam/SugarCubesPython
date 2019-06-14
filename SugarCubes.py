@@ -8,10 +8,21 @@
 from SugarCubesUtils import *
 
 # avancements
+#==============
+# Constante technique utilisée uniquement dans ce fichier
+# C'est l'état d'avancement d'une instruction SugarCubes.
+# Ce sera mis dans une instruction en cours d’exécution et ça indiquera si cette instruction est terminée ou pas.
+# Ce sont des constantes (on aurait pu écrire 'y' 'n' ...)
+
 PAS_FINI = 0
 FINI = 1
 
+# Constante utilisable par les programmeurs SugarCubes.
+# Elle sera mise dans une entête d'instruction bloc.
+# Cette constante indiquera que le bloc concerné doit être répété indéfiniment. 
+# par exemple repeat(forever)
 forever = -1
+
 
 gListStr_operatorsBin = ['add', 'sub', 'mul', 'truediv', 'floordiv', 'mod', 'divmod', 'pow', 'lshift', 'rshift', 'and', 'or', 'xor', 'lt', 'le', 'eq', 'ne', 'gt', 'ge']
 
