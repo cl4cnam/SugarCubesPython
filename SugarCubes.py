@@ -11,8 +11,7 @@ from SugarCubesUtils import *
 #==============
 # Constante technique utilisée uniquement dans ce fichier
 # C'est l'état d'avancement d'une instruction SugarCubes.
-# Ce sera mis dans une instruction en cours d’exécution et ça indiquera si cette instruction est terminée ou pas.
-# Ce sont des constantes (on aurait pu écrire 'y' 'n' ...)
+# Cette constante sera mise dans une instruction en cours d’exécution et indiquera si cette instruction est terminée ou pas.
 
 PAS_FINI = 0
 FINI = 1
